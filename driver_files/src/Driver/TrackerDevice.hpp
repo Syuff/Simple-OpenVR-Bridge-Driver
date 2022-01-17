@@ -5,6 +5,8 @@
 
 #include <linalg.h>
 
+#include <Driver/Observer.hpp>
+
 #include <Driver/IVRDevice.hpp>
 #include <Native/DriverFactory.hpp>
 
@@ -12,6 +14,7 @@
 #include <sstream>
 #include <iostream>
 #include <string>
+
 
 namespace ExampleDriver {
     class TrackerDevice : public IVRDevice {
@@ -46,8 +49,10 @@ namespace ExampleDriver {
         bool isSetup;
 
         std::chrono::milliseconds _pose_timestamp;
+        std::chrono::milliseconds _update_timestamp = std::chrono::milliseconds::zero();
 
         vr::DriverPose_t last_pose_ = IVRDevice::MakeDefaultPose();
+        
 
         bool did_vibrate_ = false;
         float vibrate_anim_state_ = 0.f;
@@ -59,6 +64,7 @@ namespace ExampleDriver {
 
         int max_saved = 10;
         std::vector<std::vector<double>> prev_positions; // prev_positions[:][0] je time since now (koliko cajta nazaj se je naredl, torej min-->max)
+        Observer_class observer;
         double last_update = 0;
         double max_time = 1;
         double smoothing = 0;
