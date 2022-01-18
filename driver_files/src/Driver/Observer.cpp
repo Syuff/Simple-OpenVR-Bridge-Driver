@@ -21,7 +21,7 @@ void Observer_class::add_sensor(std::array<double,N_DOF> (&sensor),const int sen
 };
 
 void Observer_class::output(const double Ts){ 
-    std::array<double,N_DOF> temp_values = {0};
+    //std::array<double,N_DOF> temp_values = {0};
     Matrix<double,N_ORDER,N_DOF> next_states = {{0}};
     for (int k = 0; k < N_DOF; ++k) {
         for (int j = 0; j < N_ORDER; ++j) {
@@ -29,6 +29,7 @@ void Observer_class::output(const double Ts){
                 next_states[j][k] += ((eye(j,i) + Ts * A[j][i]) * states[i][k]);
             }
         }
+    }
     output_states = next_states;
 };
 
