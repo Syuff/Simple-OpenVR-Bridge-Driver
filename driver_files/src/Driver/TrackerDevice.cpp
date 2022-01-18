@@ -163,8 +163,13 @@ int ExampleDriver::TrackerDevice::get_next_pose(double time_offset, double pred[
     double time_since_epoch_seconds = time_since_epoch.count() / 1000.0;
     double pose_time_delta_seconds = (time_since_epoch - _pose_timestamp).count() / 1000.0;
     double Ts = (time_since_epoch-_update_timestamp).count() / 1000.0;
-    _update_timestamp = time_since_epoch;
-
+    //std::chrono::milliseconds time_offset_milliseconds = time_offset*1000ms;
+    //std::chrono::milliseconds ms{static_cast<long int>(1000 *time_offset)}
+    std::chrono::milliseconds time_offset_milliseconds;
+    std::chrono::duration<double> time_offset_float(time_offset);
+    time_offset_milliseconds = std::chrono::round<std::chrono::milliseconds>(time_offset_float);
+    
+    _update_timestamp = time_since_epoch - time_offset_milliseconds;
     double pred_temp[7];
 
     
