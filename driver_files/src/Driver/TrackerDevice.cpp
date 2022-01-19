@@ -101,7 +101,7 @@ void ExampleDriver::TrackerDevice::Update()
     
     double next_pose[7];
 
-    for (int i=0;i<observer.N_DOF;i++){
+    for (int i=0;i<7;i++){
         next_pose[i] = observer.output_states[observer.POSITION][i];
     }
 
@@ -188,7 +188,7 @@ int ExampleDriver::TrackerDevice::get_next_pose(double time_offset, double pred[
     
     //get position data from states, POSITION, VELOCITY, ACCELERATION
     observer.output(0); 
-    for (int i = 0; i < observer.N_DOF; i++){    
+    for (int i = 0; i < 7; i++){    
         pred[i] =  observer.output_states[observer.POSITION][i];
     };
 

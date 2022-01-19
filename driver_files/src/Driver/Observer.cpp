@@ -7,9 +7,10 @@ void Observer_class::reset_states(){
     output_states = {{0}};
     P =     
     {{
-        {1,     0,    0},
-        {0,     0,    0},
-        {0,     0,    0}
+        {1,     0,    0,    0},
+        {0,     0,    0,    0},
+        {0,     0,    0,    0},
+        {0,     0,    0,    0}
     }};
     sensors = {0};
 
