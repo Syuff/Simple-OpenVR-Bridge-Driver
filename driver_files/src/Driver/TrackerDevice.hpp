@@ -53,6 +53,7 @@ namespace ExampleDriver {
 
         vr::DriverPose_t last_pose_ = IVRDevice::MakeDefaultPose();
         
+        bool _kalman = true;
 
         bool did_vibrate_ = false;
         float vibrate_anim_state_ = 0.f;

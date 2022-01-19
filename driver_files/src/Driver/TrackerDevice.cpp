@@ -43,9 +43,10 @@ void ExampleDriver::TrackerDevice::reinit(int msaved, double mtime, double msmoo
     prev_positions = temp;
     max_time = mtime;
     smoothing = msmooth;
-    
-    //reset observer states
-    observer.reset_states();
+    if (_kalman){
+        //reset observer states
+        observer.reset_states();
+    }
 
     //Log("Settings changed! " + std::to_string(msaved) + " " + std::to_string(mtime));
 }
@@ -96,25 +97,42 @@ void ExampleDriver::TrackerDevice::Update()
     
     
     double Ts = (_pose_timestamp-_update_timestamp).count() / 1000.0;
-    observer.output(Ts); 
+
     
     
     double next_pose[7];
+    
+    if (_kalman){
+        observer.output(Ts); 
+        for (int i=0;i<7;i++){
+            next_pose[i] = observer.output_states[observer.POSITION][i];
+        }
+        pose.vecPosition[0] = next_pose[0];
+        pose.vecPosition[1] = next_pose[1];
+        pose.vecPosition[2] = next_pose[2];
 
-    for (int i=0;i<7;i++){
-        next_pose[i] = observer.output_states[observer.POSITION][i];
+        pose.qRotation.w = next_pose[3];
+        pose.qRotation.x = next_pose[4];
+        pose.qRotation.y = next_pose[5];
+        pose.qRotation.z = next_pose[6];
+        normalizeQuat(next_pose);
+    }
+    else{
+        if (get_next_pose(0, next_pose) != 0)
+            return;
+        normalizeQuat(next_pose);
+        pose.vecPosition[0] = next_pose[0] * (1 - smoothing) + pose.vecPosition[0] * smoothing;
+        pose.vecPosition[1] = next_pose[1] * (1 - smoothing) + pose.vecPosition[1] * smoothing;
+        pose.vecPosition[2] = next_pose[2] * (1 - smoothing) + pose.vecPosition[2] * smoothing;
+        pose.qRotation.w = next_pose[3] * (1 - smoothing) + pose.qRotation.w * smoothing;
+        pose.qRotation.x = next_pose[4] * (1 - smoothing) + pose.qRotation.x * smoothing;
+        pose.qRotation.y = next_pose[5] * (1 - smoothing) + pose.qRotation.y * smoothing;
+        pose.qRotation.z = next_pose[6] * (1 - smoothing) + pose.qRotation.z * smoothing;
     }
 
-    normalizeQuat(next_pose);
     
-    pose.vecPosition[0] = next_pose[0];
-    pose.vecPosition[1] = next_pose[1];
-    pose.vecPosition[2] = next_pose[2];
+    
 
-    pose.qRotation.w = next_pose[3];
-    pose.qRotation.x = next_pose[4];
-    pose.qRotation.y = next_pose[5];
-    pose.qRotation.z = next_pose[6];
 
     //normalize
     double mag = sqrt(pose.qRotation.w * pose.qRotation.w +
@@ -170,27 +188,107 @@ int ExampleDriver::TrackerDevice::get_next_pose(double time_offset, double pred[
     time_offset_milliseconds = std::chrono::round<std::chrono::milliseconds>(time_offset_float);
     
     _update_timestamp = time_since_epoch - time_offset_milliseconds;
-    double pred_temp[7];
 
     
     
     double req_time = time_since_epoch_seconds - time_offset;
 
     double new_time = last_update - req_time;
-
- //   if (new_time < -1)      //limit prediction to max 0.2 second into the future to prevent your feet from being yeeted into oblivion
-//    {
-//        new_time = -1;
-//        statuscode = 1;
-//    }
-
-    observer.update_states(Ts);
     
-    //get position data from states, POSITION, VELOCITY, ACCELERATION
-    observer.output(0); 
-    for (int i = 0; i < 7; i++){    
-        pred[i] =  observer.output_states[observer.POSITION][i];
-    };
+    if (_kalman){
+        observer.update_states(Ts);
+        observer.output(0); 
+        for (int i = 0; i < 7; i++){    
+            pred[i] =  observer.output_states[observer.POSITION][i];
+        };
+    }
+    else{
+        if (new_time < -0.2)      //limit prediction to max 0.2 second into the future to prevent your feet from being yeeted into oblivion
+            {
+                new_time = -0.2;
+                statuscode = 1;
+            }
+
+            int curr_saved = 0;
+            //double pred[7] = {0};
+
+            double avg_time = 0;
+            double avg_time2 = 0;
+            for (int i = 0; i < max_saved; i++)
+            {
+                if (prev_positions[i][0] < 0)
+                    break;
+                curr_saved++;
+                avg_time += prev_positions[i][0];
+                avg_time2 += (prev_positions[i][0] * prev_positions[i][0]);
+            }
+
+            //Log("saved values: " + std::to_string(curr_saved));
+
+            //printf("curr saved %d\n", curr_saved);
+            if (curr_saved < 4)
+            {
+                //printf("Too few values");
+                statuscode = -1;
+                return statuscode;
+                //return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+            }
+            avg_time /= curr_saved;
+            avg_time2 /= curr_saved;
+
+            //printf("avg time %f\n", avg_time);
+
+            double st = 0;
+            for (int j = 0; j < curr_saved; j++)
+            {
+                st += ((prev_positions[j][0] - avg_time) * (prev_positions[j][0] - avg_time));
+            }
+            st = sqrt(st * (1.0 / curr_saved));
+
+
+            for (int i = 1; i < 8; i++)
+            {
+                double avg_val = 0;
+                double avg_val2 = 0;
+                double avg_tval = 0;
+                for (int ii = 0; ii < curr_saved; ii++)
+                {
+                    avg_val += prev_positions[ii][i];
+                    avg_tval += (prev_positions[ii][0] * prev_positions[ii][i]);
+                    avg_val2 += (prev_positions[ii][i] * prev_positions[ii][i]);
+                }
+                avg_val /= curr_saved;
+                avg_tval /= curr_saved;
+                avg_val2 /= curr_saved;
+
+                //printf("--avg: %f\n", avg_val);
+
+                double sv = 0;
+                for (int j = 0; j < curr_saved; j++)
+                {
+                    sv += ((prev_positions[j][i] - avg_val) * (prev_positions[j][i] - avg_val));
+                }
+                sv = sqrt(sv * (1.0 / curr_saved));
+
+                //printf("----sv: %f\n", sv);
+
+                double rxy = (avg_tval - (avg_val * avg_time)) / sqrt((avg_time2 - (avg_time * avg_time)) * (avg_val2 - (avg_val * avg_val)));
+                double b = rxy * (sv / st);
+                double a = avg_val - (b * avg_time);
+
+                //printf("a: %f, b: %f\n", a, b);
+
+                double y = a + b * new_time;
+                //Log("aha: " + std::to_string(y) + std::to_string(avg_val));
+                if (abs(avg_val2 - (avg_val * avg_val)) < 0.00000001)               //bloody floating point rounding errors
+                    y = avg_val;
+
+                pred[i - 1] = y;
+                //printf("<<<< %f --> %f\n",y, pred[i-1]);
+
+
+            }
+    }
 
     return statuscode;
 }
@@ -201,30 +299,23 @@ void ExampleDriver::TrackerDevice::save_current_pose(double a, double b, double 
     
     
     // Observer: update sensor with new data
+    if (_kalman){
+        std::array<double,observer.N_DOF> sensor_data;
+        sensor_data[0] = a;
+        sensor_data[1] = b;
+        sensor_data[2] = c;
+        sensor_data[3] = w;
+        sensor_data[4] = x;
+        sensor_data[5] = y;
+        sensor_data[6] = z;
+        observer.add_sensor(sensor_data, observer.POSITION);
+        // observer.add_sensor(sensor_data, observer.ACCELERATION);
+    }
     
-    std::array<double,observer.N_DOF> sensor_data;
-    sensor_data[0] = a;
-    sensor_data[1] = b;
-    sensor_data[2] = c;
-    sensor_data[3] = w;
-    sensor_data[4] = x;
-    sensor_data[5] = y;
-    sensor_data[6] = z;
-    observer.add_sensor(sensor_data, observer.POSITION);
-    // observer.add_sensor(sensor_data, observer.ACCELERATION);
+    
     
     int pose_valid = get_next_pose(time_offset, next_pose);
-
-    double dot = x * next_pose[4] + y * next_pose[5] + z * next_pose[6] + w * next_pose[3];
-
-    if (dot < 0)
-    {
-        x = -x;
-        y = -y;
-        z = -z;
-        w = -w;
-    } 
-
+    
     //update times
     std::chrono::milliseconds time_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
     double time_since_epoch_seconds = time_since_epoch.count() / 1000.0;
@@ -237,6 +328,19 @@ void ExampleDriver::TrackerDevice::save_current_pose(double a, double b, double 
     double time_since_update = curr_time - this->last_update;
     this->last_update = curr_time;
 
+
+    double dot = x * next_pose[4] + y * next_pose[5] + z * next_pose[6] + w * next_pose[3];
+
+    if (dot < 0)
+    {
+        x = -x;
+        y = -y;
+        z = -z;
+        w = -w;
+    } 
+
+
+
     for (int i = 0; i < max_saved; i++)
     {
         if (prev_positions[i][0] >= 0)
@@ -246,16 +350,6 @@ void ExampleDriver::TrackerDevice::save_current_pose(double a, double b, double 
     }
 
     double time = time_offset;
-    
-    //std::array<double,observer.N_DOF> sensor_data;
-    //sensor_data[0] = a;
-    //sensor_data[1] = b;
-    //sensor_data[2] = c;
-    //sensor_data[3] = w;
-    //sensor_data[4] = x;
-    //sensor_data[5] = y;
-    //sensor_data[6] = z;
-    //observer.update_sensor(sensor_data);
     // double offset = (rand() % 100) / 10000.;
     // time += offset;
     // printf("%f %f\n", time, offset);
@@ -302,9 +396,6 @@ void ExampleDriver::TrackerDevice::save_current_pose(double a, double b, double 
         }
     }
     prev_positions[i][0] = time;
-
-    
-    
     prev_positions[i][1] = a;
     prev_positions[i][2] = b;
     prev_positions[i][3] = c;
@@ -320,6 +411,7 @@ void ExampleDriver::TrackerDevice::save_current_pose(double a, double b, double 
         Log("Position x: " + std::to_string(prev_positions[i][1]));
     }
     */
+
     return;
 }
 
