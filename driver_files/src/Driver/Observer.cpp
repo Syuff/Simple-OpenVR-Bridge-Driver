@@ -35,7 +35,7 @@ void Observer_class::output(const double Ts){
 
 void Observer_class::update_states(const double Ts){
     Matrix<double,N_ORDER,N_DOF> next_states = {{0}};
-    Matrix<double,N_ORDER,N_ORDER> P_bar,P_test;
+    Matrix<double,N_ORDER,N_ORDER> P_bar;
     Matrix<double,N_ORDER,N_ORDER> P_next = {{0}};
     Matrix<double,N_ORDER,N_ORDER> S = {{0}};
     Matrix<double,N_ORDER,N_ORDER> S_inv = {{0}};
@@ -54,7 +54,6 @@ void Observer_class::update_states(const double Ts){
     
     A_d_T = Matrix_transpose(A_d);
     Q_d = Matrix_mult(Matrix_mult(A_d,Q),A_d_T);
-    P_test = Matrix_mult(A_d,P);
     P_bar = Matrix_add(Matrix_mult(Matrix_mult(A_d,P),A_d_T),Q_d);
     
     for (int j = 0; j < N_ORDER; ++j) {

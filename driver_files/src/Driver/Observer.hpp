@@ -9,7 +9,7 @@ class Observer_class {
 
     public:
         enum {
-            N_ORDER  = 3, // order of model
+            N_ORDER  = 4, // order of model
             N_DOF  = 7, // degrees of freedom
             N_SENSORS = 3, // number of sensors
             POSITION = 0, // first order
@@ -39,28 +39,31 @@ class Observer_class {
 
         Matrix<double,N_ORDER,N_DOF> states = {{0}};
         Matrix<double,N_SENSORS,N_DOF> last_sensor = {0};  
-        std::array<double,N_ORDER> R = {0.03,0.03,0.3};
+        std::array<double,N_ORDER> R = {0.03,0.03,0.3, 0.03};
         std::array<int,N_SENSORS> sensors = {0};
         Matrix<double,N_ORDER,N_ORDER> P;
         Matrix<double,N_ORDER,N_ORDER> Q = 
 	    {{
-            {0.000E+00, 0.000E+00, 0.000E+00},
-            {0.000E+00, 1.058E-04, 3.203E-03},
-            {0.000E+00, 3.203E-03, 9.620E-02}
+            {0.000E+00, 0.000E+00, 0.000E+00, 0.000E+00},
+            {0.000E+00, 1.058E-04, 3.203E-03, 2.405E-05},
+            {0.000E+00, 3.203E-03, 9.620E-02, 4.810E-05},
+            {0.000E+00, 2.405E-05, 4.810E-05, 9.620E-05}
         }};
 
         inline static const Matrix<double,N_ORDER,N_ORDER> A =
         {{
-            {0, 1, 0},
-            {0, 0, 1},
-            {0, 0, 0}
+            {0.000E+00, 1.000E+00, 0.000E+00, 0.000E+00},
+            {0.000E+00, 0.000E+00, 1.000E+00, 1.000E+00},
+            {0.000E+00, 0.000E+00, 0.000E+00, 0.000E+00},
+            {0.000E+00, 0.000E+00, 0.000E+00, 0.000E+00}
         }};
         
         inline static const Matrix<double,N_ORDER,N_ORDER> C =
         {{
-            {1, 0, 0},
-            {0, 1, 0},
-            {0, 0, 1}
+            {1, 0, 0, 0},
+            {0, 1, 0, 0},
+            {0, 0, 1, 0},
+            {0, 0, 0, 1}
         }};
         
                 
